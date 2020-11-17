@@ -4,6 +4,7 @@ import os
 import functools
 import re
 import itertools
+from BillScanner.Receipt import Receipt
 
 
 def get_words(image_file):
@@ -96,51 +97,57 @@ def cleanElements(elems, total):
     print("couldt not figure out correct elemnt list")
     return elems
 
-words = get_words("test6.jpg")
-lines = sort_words(words)
-textLines = []
-for line in lines:
-    block_text = ''
-    for word in line:
-        block_text += toText(word)
-        block_text += ' '
-    textLines.append(block_text.lower())
+def getReceipt(fileName):
+    words = get_words(fileName)
+    lines = sort_words(words)
+    textLines = []
+    for line in lines:
+        block_text = ''
+        for word in line:
+            block_text += toText(word)
+            block_text += ' '
+        textLines.append(block_text.lower())
 
-DATE_REGEX = "\d\d?\.\d\d?\.\d{2}(\d{2})?"
-POST_REGEX = "(-?\d\d?[,\.]\d{2})"
-EURO_REGEX = "(eur|euro|€)"
-TOTAL_KEYWORD_REGEX = "(total|brutto|gesa[nm]t|saldo|su[nm]{2}e)"
-TOTAL_REGEX = TOTAL_KEYWORD_REGEX + " [\w\W]*?" + POST_REGEX
-ELEMENT_REGEX = "([\w\W]*?)" + POST_REGEX + "(?!" + POST_REGEX + ").*?"
+    DATE_REGEX = "\d\d?\.\d\d?\.\d{2}(\d{2})?"
+    POST_REGEX = "(-?\d\d?[,\.]\d{2})"
+    EURO_REGEX = "(eur|euro|€)"
+    TOTAL_KEYWORD_REGEX = "(total|brutto|gesa[nm]t|saldo|su[nm]{2}e)"
+    TOTAL_REGEX = TOTAL_KEYWORD_REGEX + " [\w\W]*?" + POST_REGEX
+    ELEMENT_REGEX = "([\w\W]*?)" + POST_REGEX + "(?!" + POST_REGEX + ").*?"
 
-elems = []
-date = None
-total = None
-for text in textLines:
-    print(text)
-    res = re.search(DATE_REGEX, text)
-    if res and not date:
-        date = res.group(0)
+    elems = []
+    date = None
+    total = None
+    for text in textLines:
+        print(text)
+        res = re.search(DATE_REGEX, text)
+        if res and not date:
+            date = res.group(0)
 
-    res = re.search(TOTAL_REGEX, text)
-    if res and not total:
-        total = res.group(2)
+        res = re.search(TOTAL_REGEX, text)
+        if res and not total:
+            total = res.group(2)
+            total = float(total.replace(",", "."))
 
 
-    res = re.compile(POST_REGEX)
-    res = res.findall(text)
-    if res:
-        price = res[-1]
-        elementName = text[:text.rfind(price)]
-        price = float(price.replace(",", "."))
-        elems.append((elementName, price))
+        if not total:
+            res = re.compile(POST_REGEX)
+            res = res.findall(text)
+            if res:
+                price = res[-1]
+                elementName = text[:text.rfind(price)]
+                price = float(price.replace(",", "."))
+                elems.append((elementName, price))
 
-store = textLines[0]
+    store = textLines[0]
 
-print("")
-print(date)
-print(store)
-print(total)
-elems = cleanElements(elems, total)
-for e in elems:
-    print(e[0] + ": " + str(e[1]))
+    print("")
+    print(date)
+    print(store)
+    print(total)
+    elems = cleanElements(elems, total)
+    for e in elems:
+        print(e[0] + ": " + str(e[1]))
+
+    return Receipt(total, store, date, elems)
+
