@@ -3,7 +3,8 @@ import io
 import os
 import functools
 import re
-import more_itertools as itertools_more
+import itertools
+
 
 def get_words(image_file):
     """Returns document bounds given an image."""
@@ -64,58 +65,82 @@ def toText(word):
     return block_text
 
 def cleanElements(elems, total):
+    total = total.replace(",", ".")
+    total = float(total)
+
     idx = -1
+    minprice = 2000000000.0
     for i, e in enumerate(elems):
+        if float(e[1]) > 0:
+            minprice = min(minprice, float(e[1]))
         if re.search(TOTAL_KEYWORD_REGEX, e[0]):
             idx = i
             break
+
     elems = elems[:idx]
-    total = float(total.replace(",", "."))
-    s = 0
-    for i, e in enumerate(elems):
-        s += float(e[1])
-        if s == total:
-            return elems[:i]
-    
+    sumPrice = round(sum([float(y[1]) for y in elems]), 2)
+    if sumPrice <= total:
+        if sumPrice < total:
+            print("could not figure out correct list of elements")
+        return elems
+    diff = round(sumPrice - total, 2)
+    upperBound = int(max(min(int(sumPrice/minprice), len(elems)/3), 5))
+
+    for i in range(upperBound):
+        powset = itertools.combinations(elems, i)
+        elems1 = list(filter(lambda x: round(sum([float(y[1]) for y in x]), 2) == diff, powset))
+        if len(elems1) == 1:
+            for e in elems1[0]:
+                elems.remove(e)
+            return elems
+    print("couldt not figure out correct elemnt list")
     return elems
 
-
-words = get_words("test4.gif")
+words = get_words("test6.jpg")
 lines = sort_words(words)
-text = ''
+textLines = []
 for line in lines:
     block_text = ''
     for word in line:
         block_text += toText(word)
         block_text += ' '
-    text += block_text + '\n'
+    textLines.append(block_text.lower())
 
-text = text.lower()
-print(text)
-
-DATE_REGEX = "\d\d?\.\d\d?\.\d{4}"
-POST_REGEX = "(\d\d?[,\.]\d{2})"
+DATE_REGEX = "\d\d?\.\d\d?\.\d{2}(\d{2})?"
+POST_REGEX = "(-?\d\d?[,\.]\d{2})"
 EURO_REGEX = "(eur|euro|€)"
 TOTAL_KEYWORD_REGEX = "(total|brutto|gesa[nm]t|saldo|su[nm]{2}e)"
-TOTAL_REGEX = TOTAL_KEYWORD_REGEX + " [\w\W]*?" + POST_REGEX + " " 
-ELEMENT_REGEX = "^(.*?)\n?" + POST_REGEX + " " 
+TOTAL_REGEX = TOTAL_KEYWORD_REGEX + " [\w\W]*?" + POST_REGEX
+ELEMENT_REGEX = "([\w\W]*?)" + POST_REGEX + "(?!" + POST_REGEX + ").*?"
 
-res = re.search(DATE_REGEX, text)
-date = res.group(0)
-print(date)
-
-res = re.search(TOTAL_REGEX, text)
-total = res.group(2)
-print(total)
-
-res = re.compile(ELEMENT_REGEX, re.MULTILINE)
-res = res.findall(text)
 elems = []
-for l in res:
-    elementName = l[0]
-    price = l[1].replace(",", ".")
-    elems.append((elementName, price))
+date = None
+total = None
+for text in textLines:
+    print(text)
+    res = re.search(DATE_REGEX, text)
+    if res and not date:
+        date = res.group(0)
 
+    res = re.search(TOTAL_REGEX, text)
+    if res and not total:
+        total = res.group(2)
+
+
+    res = re.compile(POST_REGEX)
+    res = res.findall(text)
+    if res:
+        price = res[-1]
+        elementName = text[:text.rfind(price)]
+        price = float(price.replace(",", "."))
+        elems.append((elementName, price))
+
+store = textLines[0]
+
+print("")
+print(date)
+print(store)
+print(total)
 elems = cleanElements(elems, total)
 for e in elems:
-    print(e[0] + ": " + e[1])
+    print(e[0] + ": " + str(e[1]))
