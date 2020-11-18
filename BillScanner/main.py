@@ -4,7 +4,17 @@ import os
 import functools
 import re
 import itertools
+import sys
+
+print(sys.path)
 from BillScanner.Receipt import Receipt
+
+DATE_REGEX = "\d\d?\.\d\d?\.\d{2}(\d{2})?"
+POST_REGEX = "(-?\d\d?[,\.]\d{2})"
+EURO_REGEX = "(eur|euro|€)"
+TOTAL_KEYWORD_REGEX = "(total|brutto|gesa[nm]t|saldo|su[nm]{2}e)"
+TOTAL_REGEX = TOTAL_KEYWORD_REGEX + " [\w\W]*?" + POST_REGEX
+ELEMENT_REGEX = "([\w\W]*?)" + POST_REGEX + "(?!" + POST_REGEX + ").*?"
 
 
 def get_words(image_file):
@@ -66,19 +76,11 @@ def toText(word):
     return block_text
 
 def cleanElements(elems, total):
-    total = total.replace(",", ".")
-    total = float(total)
-
-    idx = -1
     minprice = 2000000000.0
     for i, e in enumerate(elems):
         if float(e[1]) > 0:
             minprice = min(minprice, float(e[1]))
-        if re.search(TOTAL_KEYWORD_REGEX, e[0]):
-            idx = i
-            break
 
-    elems = elems[:idx]
     sumPrice = round(sum([float(y[1]) for y in elems]), 2)
     if sumPrice <= total:
         if sumPrice < total:
@@ -108,12 +110,6 @@ def getReceipt(fileName):
             block_text += ' '
         textLines.append(block_text.lower())
 
-    DATE_REGEX = "\d\d?\.\d\d?\.\d{2}(\d{2})?"
-    POST_REGEX = "(-?\d\d?[,\.]\d{2})"
-    EURO_REGEX = "(eur|euro|€)"
-    TOTAL_KEYWORD_REGEX = "(total|brutto|gesa[nm]t|saldo|su[nm]{2}e)"
-    TOTAL_REGEX = TOTAL_KEYWORD_REGEX + " [\w\W]*?" + POST_REGEX
-    ELEMENT_REGEX = "([\w\W]*?)" + POST_REGEX + "(?!" + POST_REGEX + ").*?"
 
     elems = []
     date = None
@@ -150,4 +146,6 @@ def getReceipt(fileName):
         print(e[0] + ": " + str(e[1]))
 
     return Receipt(total, store, date, elems)
+
+r = getReceipt("test/res/test2.jpg")
 
